@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Venue Map & Directory</title>
+    <title>AFU 5th Convocation - Interactive Map</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -178,7 +178,7 @@
 </head>
 <body>
 
-    <h1>Interactive Event Venue Map</h1>
+    <h1>AFU 5<sup>th</sup> Convocation - Interactive Event Venue Map</h1>
 
     <div class="main-wrapper">
         <!-- 1. Map Canvas Section -->
@@ -387,23 +387,23 @@
         }
 // --------------------delete this----------------
         // TEMPORARY TOOL: Click anywhere on the map to get your coordinates!
-canvas.addEventListener('click', function(event) {
-    const rect = canvas.getBoundingClientRect();
+// canvas.addEventListener('click', function(event) {
+//     const rect = canvas.getBoundingClientRect();
     
-    // 1. Calculate where you clicked inside the box
-    const clickXRelative = event.clientX - rect.left;
-    const clickYRelative = event.clientY - rect.top;
+//     // 1. Calculate where you clicked inside the box
+//     const clickXRelative = event.clientX - rect.left;
+//     const clickYRelative = event.clientY - rect.top;
     
-    // 2. Convert that exact click point into a percentage (0 to 100)
-    const percentX = Math.round((clickXRelative / rect.width) * 100);
-    const percentY = Math.round((clickYRelative / rect.height) * 100);
+//     // 2. Convert that exact click point into a percentage (0 to 100)
+//     const percentX = Math.round((clickXRelative / rect.width) * 100);
+//     const percentY = Math.round((clickYRelative / rect.height) * 100);
     
-    // 3. Pop up the code snippet so you can copy-paste it directly!
-    const outputString = `{ id: 7, name: "New Location", x: ${percentX}, y: ${percentY}, color: "#ff5722", desc: "Description here.", photo: "path/to/photo.jpg" },`;
+//     // 3. Pop up the code snippet so you can copy-paste it directly!
+//     const outputString = `{ id: 7, name: "New Location", x: ${percentX}, y: ${percentY}, color: "#ff5722", desc: "Description here.", photo: "path/to/photo.jpg" },`;
     
-    alert("Copy this code snippet into your landmarks array:\n\n" + outputString);
-    console.log(outputString);
-});
+//     alert("Copy this code snippet into your landmarks array:\n\n" + outputString);
+//     console.log(outputString);
+// });
     </script>
 </body>
 </html>
