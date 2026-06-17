@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Venue Map & Directory</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f6f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        /* Two-column layout container */
+        .main-wrapper {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            width: 100%;
+            max-width: 1400px;
+            background: #fff;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        }
+
+        /* Map Column (Flexible Left) */
+        .map-container {
+            position: relative;
+            flex: 3; /* Takes up 3 parts of space */
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e0e0e0;
+        }
+
+        #mapCanvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            cursor: pointer;
+        }
+
+        /* Sidebar Directory Column (Fixed Right) */
+        .sidebar-directory {
+            flex: 1; /* Takes up 1 part of space */
+            min-width: 300px;
+            max-height: 75vh;
+            overflow-y: auto; /* Scrollable if 20+ items exceed height */
+            padding-right: 5px;
+        }
+
+        .sidebar-directory h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+            position: sticky;
+            top: 0;
+            background: #fff;
+        }
+
+        /* Individual Legend Item Styling */
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .legend-item:hover {
+            background: #eef2f7;
+            transform: translateX(3px);
+        }
+
+        /* Active/Highlighted state from Map Click */
+        .legend-item.active {
+            background: #e8f4fd;
+            border-left-color: #3498db;
+        }
+
+        /* Number Badge Matching Map Pin */
+        .badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .location-name {
+            font-weight: 600;
+            color: #34495e;
+            font-size: 14px;
+        }
+
+        /* Responsive stack for tablets/phones */
+        @media (max-width: 900px) {
+            .main-wrapper {
+                flex-direction: column;
+            }
+            .sidebar-directory {
+                max-height: 300px;
+            }
+        }
+
+        /* Popup Modal Styles */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            background-color: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            position: relative;
+            transform: scale(0.8);
+            transition: transform 0.3s ease;
+        }
+
+        .modal.show .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+        }
+
+        .modal-close:hover { color: #333; }
+        #modalImage { width: 100%; height: auto; border-radius: 6px; margin-top: 10px; background-color: #eee; }
+        #modalTitle { margin: 10px 0 5px 0; color: #222; }
+        #modalDesc { color: #666; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <h1>Interactive Event Venue Map</h1>
+
+    <div class="main-wrapper">
+        <!-- 1. Map Canvas Section -->
+        <div class="map-container">
+            <canvas id="mapCanvas"></canvas>
+        </div>
+
+        <!-- 2. Dynamic Sidebar Legend Directory -->
+        <div class="sidebar-directory">
+            <h3>Venue Directory</h3>
+            <div id="legendList"></div>
+        </div>
+    </div>
+
+    <!-- Info Popup Modal -->
+    <div id="infoModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">Landmark</h2>
+            <p id="modalDesc">Description goes here.</p>
+            <img id="modalImage" src="" alt="Snapshot View">
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+
+        // Path to your map image
+        img.src = 'event area.png'; 
+
+        // 20+ LANDMARKS CONFIGURATION DATA
+        // Simply keep pasting items here up to 20+. The system handles numbering dynamically!
+        const landmarks = [
+            { 
+                id: 1, 
+                name: "Registration Desk", 
+                x: 36, y: 95, 
+                color: "#3498db", 
+                desc: "Everyone must register before entering to the event area.", 
+                photo: "https://via.placeholder.com/500x300?text=Parking+Lot+Snapshot" 
+            },
+            { 
+                id: 2, 
+                name: "Main Entrance Gate", 
+                x: 37, y: 87, 
+                color: "#e74c3c", 
+                desc: "After entering to the venue please proceed to the Event area.", 
+                photo: "https://via.placeholder.com/500x300?text=Parking+Lot+Snapshot" 
+            },
+            { id: 3, name: "Exit Gate", x: 65, y: 86, color: "#e74c3c", desc: "Welcome to the venue. Main Exit gate for all guests.", photo: "https://via.placeholder.com/500x300?text=Main+Entrance+Snapshot" },
+            { id: 4, name: "Agriculture and Forestry Univeristy, Central Office", x: 44, y: 46, color: "#2ecc71", desc: "The central complex hosting the primary exhibitions and main stage events.", photo: "https://via.placeholder.com/500x300?text=Main+Hall+Snapshot" },
+            { id: 5, name: "Stage Area", x: 77, y: 60, color: "#9b59b6", desc: "This is the stage", photo: "https://via.placeholder.com/500x300?text=Restrooms+Snapshot" },
+            { id: 6, name: "Sitting/Event Area", x: 70, y: 68, color: "#9b59b6", desc: "You will seat here as directed.", photo: "https://via.placeholder.com/500x300?text=Restrooms+Snapshot" },
+            { id: 7, name: "Staff Only Parking", x: 15, y: 80, color: "#f1c40f", desc: "Staff, Guest and Professors Parking.", photo: "https://via.placeholder.com/500x300?text=Outdoor+Lawn+Snapshot" },
+            { id: 8, name: "Photo Canopy", x: 19, y: 73, color: "#e67e22", desc: "Pay-n-Click-Photo from here.", photo: "https://via.placeholder.com/500x300?text=Storage+Villa" },
+            { id: 9, name: "Water Canopy", x: 23, y: 73, color: "#3498db", desc: "Feel Thristy. Grab a bottle here.", photo: "https://via.placeholder.com/500x300?text=Storage+Villa" },
+            { id: 10, name: "Multi-Purpose Hall", x: 59, y: 61, color: "#2ecc71", desc: "Backstage operations, equipment storage, and maintenance control villa.", photo: "https://via.placeholder.com/500x300?text=Storage+Villa" },
+            { id: 11, name: "Office of the Controller of Examination", x: 26, y: 55, color: "#2ecc71", desc: "Backstage operations, equipment storage, and maintenance control villa.", photo: "https://via.placeholder.com/500x300?text=Storage+Villa" },
+            { id: 12, name: "Restroom", x: 56, y: 58, color: "#ff5722", desc: "Restroom at the ground floor. One restroom at the first floor", photo: "path/to/photo.jpg" },
+            { id: 13, name: "Restroom", x: 60, y: 66, color: "#ff5722", desc: " Restroom at the ground floor. One restroom at the first floor", photo: "path/to/photo.jpg" },
+            { id: 14, name: "Restroom", x: 32, y: 84, color: "#ff5722", desc: "This Guard Room has only single usage restroom.", photo: "path/to/photo.jpg" },
+            { id: 15, name: "Restroom", x: 35, y: 44, color: "#ff5722", desc: "Restroom inside the building.", photo: "path/to/photo.jpg" },
+            { id: 16, name: "Visitors Bike Parking", x: 21, y: 88, color: "#f1c40f", desc: "As visitors vehicle is not permitted inside the permise so two wheelers are to be parked either side of the entrance.", photo: "https://via.placeholder.com/500x300?text=Outdoor+Lawn+Snapshot" },
+            { id: 17, name: "Visitors Bike Parking", x: 46, y: 90, color: "#f1c40f", desc: "As visitors vehicle is not permitted inside the permise so two wheelers are to be parked either side of the entrance.", photo: "https://via.placeholder.com/500x300?text=Outdoor+Lawn+Snapshot" },
+            { id: 18, name: "Visitors Car Parking", x: 74, y: 73, color: "#f1c40f", desc: "As visitors vehicle is not permitted inside the permise so four wheelers are to be parked on the roadside.", photo: "https://via.placeholder.com/500x300?text=Outdoor+Lawn+Snapshot" },
+            { id: 19, name: "Water Canopy", x: 55, y: 75, color: "#3498db", desc: "Feel Thristy. Grab a bottle here.", photo: "https://via.placeholder.com/500x300?text=Storage+Villa" },
+            { id: 20, name: "Lunch Box Distribution Area", x: 62, y: 85, color: "#e74c3c", desc: "From here we will scan your QR and provide Lunch Box.", photo: "https://via.placeholder.com/500x300?text=Main+Entrance+Snapshot" },
+            { id: 21, name: "Bsc. AG Certificate Distribution-1", x: 21, y: 60, color: "#e74c3c", desc: "Collect your Certificate from here", photo: "https://via.placeholder.com/500x300?text=Main+Entrance+Snapshot" },
+            { id: 22, name: "Bsc. AG Certificate Distribution-2", x: 25, y: 61, color: "#e74c3c", desc: "Collect your Certificate from here", photo: "https://via.placeholder.com/500x300?text=Main+Entrance+Snapshot" },
+            { id: 23, name: "Bsc. AG Certificate Distribution-3", x: 28, y: 58, color: "#e74c3c", desc: "Collect your Certificate from here", photo: "https://via.placeholder.com/500x300?text=Main+Entrance+Snapshot" },
+            { id: 24, name: "Bsc. AG Certificate Distribution-4", x: 30, y: 55, color: "#e74c3c", desc: "Collect your Certificate from here", photo: "https://via.placeholder.com/500x300?text=Main+Entrance+Snapshot" },
+            { id: 25, name: "Bsc. Forestry Certificate Distribution", x: 38, y: 53, color: "#2f441f", desc: "Collect your Certificate from here", photo: "https://via.placeholder.com/500x300?text=Main+Entrance+Snapshot" },
+            { id: 26, name: "B.V.Sc & HA/Fisheries Certificate Distribution", x: 45, y: 56, color: "#7A232E", desc: "Collect your Certificate from here", photo: "https://via.placeholder.com/500x300?text=Main+Entrance+Snapshot" },
+            { id: 27, name: "Selfie Point", x: 36, y: 72, color: "#1194a8", desc: "Make a lifetime memory with our photo stand", photo: "https://via.placeholder.com/500x300?text=Main+Entrance+Snapshot" },
+            { id: 28, name: "Selfie Point", x: 37, y: 74, color: "#1194a8", desc: "Make a lifetime memory with our photo stand", photo: "https://via.placeholder.com/500x300?text=Main+Entrance+Snapshot" },
+            { id: 29, name: "Selfie Point", x: 40, y: 75, color: "#1194a8", desc: "Make a lifetime memory with our photo stand", photo: "https://via.placeholder.com/500x300?text=Main+Entrance+Snapshot" },
+            { id: 30, name: "Selfie Point", x: 42, y: 73, color: "#1194a8", desc: "Make a lifetime memory with our photo stand", photo: "https://via.placeholder.com/500x300?text=Main+Entrance+Snapshot" },
+
+            // Add items 7 to 25 right here following this exact structure!
+        ];
+
+        const pinRadius = 13; // Sightly larger radius to accommodate the dynamic numbers inside the pin
+
+        img.onload = function() {
+            resizeCanvas();
+            generateSidebar();
+            window.addEventListener('resize', resizeCanvas);
+        };
+
+        function resizeCanvas() {
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            drawMap();
+        }
+
+        // Draw background layout and overlay numbered pins
+        function drawMap() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+
+            landmarks.forEach((point, index) => {
+                const actualX = (point.x / 100) * canvas.width;
+                const actualY = (point.y / 100) * canvas.height;
+
+                // Translucent glow
+                ctx.beginPath();
+                ctx.arc(actualX, actualY, pinRadius + 6, 0, 2 * Math.PI);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+                ctx.fill();
+
+                // Solid pin center
+                ctx.beginPath();
+                ctx.arc(actualX, actualY, pinRadius, 0, 2 * Math.PI);
+                ctx.fillStyle = point.color;
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+
+                // Draw number text inside the pin centered perfectly
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 13px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(index + 1, actualX, actualY + 1);
+            });
+        }
+
+        // Automatically construct the sidebar UI based on the landmarks array
+        function generateSidebar() {
+            const listContainer = document.getElementById('legendList');
+            listContainer.innerHTML = '';
+
+            landmarks.forEach((point, index) => {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+                item.id = `sidebar-item-${index}`;
+                item.onclick = () => selectLandmark(point, index);
+
+                item.innerHTML = `
+                    <div class="badge" style="background-color: ${point.color}">${index + 1}</div>
+                    <div class="location-name">${point.name}</div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        // Action when a pin or sidebar list item is triggered
+        function selectLandmark(landmark, index) {
+            // Remove active states from sidebar
+            document.querySelectorAll('.legend-item').forEach(el => el.classList.remove('active'));
+            
+            // Highlight current sidebar item and scroll it smoothly into view
+            const activeSidebarItem = document.getElementById(`sidebar-item-${index}`);
+            if(activeSidebarItem) {
+                activeSidebarItem.classList.add('active');
+                activeSidebarItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            // Fire up modal with custom image views
+            openModal(landmark);
+        }
+
+        // Handle Canvas Clicks
+        canvas.addEventListener('click', function(event) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            const clickX = (event.clientX - rect.left) * scaleX;
+            const clickY = (event.clientY - rect.top) * scaleY;
+
+            let foundIndex = -1;
+
+            landmarks.forEach((point, index) => {
+                const targetX = (point.x / 100) * canvas.width;
+                const targetY = (point.y / 100) * canvas.height;
+                const distance = Math.sqrt((clickX - targetX) ** 2 + (clickY - targetY) ** 2);
+                
+                if (distance <= pinRadius + 10) { 
+                    foundIndex = index;
+                }
+            });
+
+            if (foundIndex !== -1) {
+                selectLandmark(landmarks[foundIndex], foundIndex);
+            }
+        });
+
+        function openModal(landmark) {
+            document.getElementById('modalTitle').innerText = landmark.name;
+            document.getElementById('modalDesc').innerText = landmark.desc;
+            document.getElementById('modalImage').src = landmark.photo;
+            document.getElementById('infoModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('infoModal').classList.remove('show');
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('infoModal');
+            if (event.target == modal) closeModal();
+        }
+// --------------------delete this----------------
+        // TEMPORARY TOOL: Click anywhere on the map to get your coordinates!
+canvas.addEventListener('click', function(event) {
+    const rect = canvas.getBoundingClientRect();
+    
+    // 1. Calculate where you clicked inside the box
+    const clickXRelative = event.clientX - rect.left;
+    const clickYRelative = event.clientY - rect.top;
+    
+    // 2. Convert that exact click point into a percentage (0 to 100)
+    const percentX = Math.round((clickXRelative / rect.width) * 100);
+    const percentY = Math.round((clickYRelative / rect.height) * 100);
+    
+    // 3. Pop up the code snippet so you can copy-paste it directly!
+    const outputString = `{ id: 7, name: "New Location", x: ${percentX}, y: ${percentY}, color: "#ff5722", desc: "Description here.", photo: "path/to/photo.jpg" },`;
+    
+    alert("Copy this code snippet into your landmarks array:\n\n" + outputString);
+    console.log(outputString);
+});
+    </script>
+</body>
+</html>
